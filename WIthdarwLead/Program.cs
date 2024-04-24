@@ -5,7 +5,7 @@ namespace WithdarwLead
 {
     class Program
     {
-        static string connectionstring = "Server=ec2-3-143-227-246.us-east-2.compute.amazonaws.com,1433;Database=wasitee;User Id= WSUsr; Password=1234!@#$; TrustServerCertificate=True";
+        static string connectionstring = "Server=ec2-3-143-227-246.us-east-2.compute.amazonaws.com,1433;Database=gosales;User Id= WSUsr; Password=1234!@#$; TrustServerCertificate=True";
 
         static void Main(string[] args)
         {
@@ -48,7 +48,7 @@ namespace WithdarwLead
                 return dt;
             }
 
-            int AssignLeads(int agentId)
+           int AssignLeads(int agentId)
             {
                 int leadCount = GetLeadCount(agentId);
                 if (leadCount > 0)
@@ -97,14 +97,6 @@ namespace WithdarwLead
                     {
                         while (reader.Read())
                         {
-                            //int currentAgentId = reader.GetInt32(0);
-                            //int leadCount = reader.GetInt32(1);
-
-                            //if (leadCount < 100)
-                            //{
-                            //    minLeadCount = leadCount;
-                            //    agentId = currentAgentId;
-                            //}
                             agentId = reader.GetInt32(0);
                         }
                     }
