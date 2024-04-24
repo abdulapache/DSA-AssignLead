@@ -475,11 +475,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Prsonal\\WIthdarwLead\\WIthdarwLead\\WIthdarwLead.csproj",
+      "projectUniqueName": "D:\\Prsonal\\WithDrawLead\\WIthdarwLead\\WIthdarwLead.csproj",
       "projectName": "WIthdarwLead",
-      "projectPath": "D:\\Prsonal\\WIthdarwLead\\WIthdarwLead\\WIthdarwLead.csproj",
+      "projectPath": "D:\\Prsonal\\WithDrawLead\\WIthdarwLead\\WIthdarwLead.csproj",
       "packagesPath": "C:\\Users\\rahma\\.nuget\\packages\\",
-      "outputPath": "D:\\Prsonal\\WIthdarwLead\\WIthdarwLead\\obj\\",
+      "outputPath": "D:\\Prsonal\\WithDrawLead\\WIthdarwLead\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\rahma\\AppData\\Roaming\\NuGet\\NuGet.Config",

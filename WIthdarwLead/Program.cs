@@ -5,47 +5,13 @@ namespace WithdarwLead
 {
     class Program
     {
-        static string connectionstring = "Server=ec2-3-143-227-246.us-east-2.compute.amazonaws.com,1433;Database=gosales;User Id= WSUsr; Password=1234!@#$; TrustServerCertificate=True";
-
-
-        static Timer timer;
+        static string connectionstring = "Server=ec2-3-143-227-246.us-east-2.compute.amazonaws.com,1433;Database=wasitee;User Id= WSUsr; Password=1234!@#$; TrustServerCertificate=True";
 
         static void Main(string[] args)
         {
-            // Start the timer to execute the program every 30 minutes
-            SetTimer();
-
-            // Keep the program running
-            Console.ReadLine();
-        }
-
-        static void SetTimer()
-        {
-            // Calculate the time until the next 30-minute interval
-            DateTime now = DateTime.Now;
-            DateTime nextRunTime = now.AddMinutes(5- now.Minute % 5).AddSeconds(-now.Second);
-
-            // Check if it's Sunday, if yes, set the next run time to next Monday
-            if (nextRunTime.DayOfWeek == DayOfWeek.Sunday)
-            {
-                nextRunTime = nextRunTime.AddDays(1);
-            }
-
-            // Calculate the delay until the next run time
-            TimeSpan delay = nextRunTime - now;
-
-            // Create a timer to trigger the program execution
-            timer = new Timer(ExecuteProgram, null, delay, TimeSpan.FromMinutes(5));
-        }
-
-        static void ExecuteProgram(object state)
-        {
-
-            if (IsWithinAllowedTimeRange())
-            {
-
-                var dsa = GoSalesAgentList();
-                if (dsa != null)
+        Start:
+            var dsa = GoSalesAgentList();
+             if (dsa != null)
                 {
                     foreach (DataRow row in dsa.Rows)
                     {
@@ -56,11 +22,8 @@ namespace WithdarwLead
                         }
                     }
                 }
-            }
-            else
-            {
-                Console.WriteLine("Program execution skipped due to time restriction.");
-            }
+
+
             DataTable GoSalesAgentList()
             {
                 DataTable dt = new DataTable();
@@ -72,7 +35,7 @@ namespace WithdarwLead
                     con.Open();
                     SqlCommand cmd = new SqlCommand();
                     cmd.Connection = con;
-                    cmd.CommandText = "select Id from BusinessUsers where IsActive=1 and Roles IN('MM2','MM1','MM3') ";
+                    cmd.CommandText = "SELECT Id FROM BusinessUsers WHERE IsActive = 0 and Roles IN('MM2','MM1','MM3') AND Id IN ( SELECT CurrentAssignTo FROM LeadEngine  WHERE ProcessedStatus = 0 GROUP BY CurrentAssignTo HAVING COUNT(*) > 0); ";
                     adapter.SelectCommand = cmd;
                     adapter.Fill(dt);
                     con.Close();
@@ -88,7 +51,7 @@ namespace WithdarwLead
             int AssignLeads(int agentId)
             {
                 int leadCount = GetLeadCount(agentId);
-                if (leadCount > 100)
+                if (leadCount > 0)
                 {
                     var otherAgentId = GetAgentWithLeastLeads();
                     if (otherAgentId != -1)
@@ -129,19 +92,20 @@ namespace WithdarwLead
                 using (SqlConnection conn = new SqlConnection(connectionstring))
                 {
                     conn.Open();
-                    using (SqlCommand cmd = new SqlCommand("SELECT CurrentAssignTo, COUNT(*) AS LeadCount FROM LeadEngine WHERE ProcessedStatus = 0 AND CurrentAssignTo IN (SELECT Id FROM BusinessUsers WHERE IsActive = 1  AND Roles IN ('MM2', 'MM1', 'MM3')) GROUP BY CurrentAssignTo ORDER BY LeadCount ASC", conn))
+                    using (SqlCommand cmd = new SqlCommand("SELECT CurrentAssignTo, COUNT(*) AS LeadCount FROM LeadEngine WHERE ProcessedStatus = 0 AND CurrentAssignTo IN (SELECT Id FROM BusinessUsers WHERE IsActive = 1  AND Roles IN ('MM2', 'MM1', 'MM3')) GROUP BY CurrentAssignTo HAVING COUNT(*) < 100 ORDER BY LeadCount ASC", conn))
                     using (SqlDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
-                            int currentAgentId = reader.GetInt32(0);
-                            int leadCount = reader.GetInt32(1);
+                            //int currentAgentId = reader.GetInt32(0);
+                            //int leadCount = reader.GetInt32(1);
 
-                            if (leadCount < 100)
-                            {
-                                minLeadCount = leadCount;
-                                agentId = currentAgentId;
-                            }
+                            //if (leadCount < 100)
+                            //{
+                            //    minLeadCount = leadCount;
+                            //    agentId = currentAgentId;
+                            //}
+                            agentId = reader.GetInt32(0);
                         }
                     }
                 }
@@ -154,7 +118,7 @@ namespace WithdarwLead
                 using (SqlConnection conn = new SqlConnection(connectionstring))
                 {
                     conn.Open();
-                    using (SqlCommand cmd = new SqlCommand("UPDATE TOP (100) LeadEngine SET CurrentAssignTo = @TargetAgentId WHERE CurrentAssignTo = @SourceAgentId", conn))
+                    using (SqlCommand cmd = new SqlCommand("UPDATE TOP (80) LeadEngine SET CurrentAssignTo = @TargetAgentId WHERE CurrentAssignTo = @SourceAgentId", conn))
                     {
                         cmd.Parameters.AddWithValue("@SourceAgentId", sourceAgentId);
                         cmd.Parameters.AddWithValue("@TargetAgentId", targetAgentId);
@@ -162,21 +126,11 @@ namespace WithdarwLead
                     }
                 }
             }
-            
-            
-            Console.WriteLine("with draw lead every 15 mint and assign to other user");
-            
+
+            Thread.Sleep(86400000);
+            Console.WriteLine("Lead Assignement has done successfully for total:" + DateTime.Now.ToString());
+            goto Start;
         }
-
-
-        static bool IsWithinAllowedTimeRange()
-        {
-            // Check if the current time is between 9 AM and 7 PM
-            TimeSpan now = DateTime.Now.TimeOfDay;
-            TimeSpan startTime = TimeSpan.FromHours(4);
-            TimeSpan endTime = TimeSpan.FromHours(14);
-
-            return now >= startTime && now <= endTime;
-        }
+       
     }
 }
