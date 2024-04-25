@@ -23,7 +23,7 @@ namespace WithdarwLead
         {
             // Calculate the time until the next 30-minute interval
             DateTime now = DateTime.Now;
-            DateTime nextRunTime = now.AddMinutes(5 - now.Minute % 5).AddSeconds(-now.Second);
+            DateTime nextRunTime = now.AddHours(3 - now.Minute % 3).AddMinutes(-now.Minute).AddSeconds(-now.Second);
 
             // Check if it's Sunday, if yes, set the next run time to next Monday
             if (nextRunTime.DayOfWeek == DayOfWeek.Sunday)
@@ -35,7 +35,7 @@ namespace WithdarwLead
             TimeSpan delay = nextRunTime - now;
 
             // Create a timer to trigger the program execution
-            timer = new Timer(ExecuteProgram, null, delay, TimeSpan.FromMinutes(5));
+            timer = new Timer(ExecuteProgram, null, (int)nextRunTime.Subtract(now).TotalMilliseconds, TimeSpan.FromHours(3).Milliseconds);
         }
 
         static void ExecuteProgram(object state)
@@ -108,7 +108,7 @@ namespace WithdarwLead
                     con.Open();
                     SqlCommand cmd = new SqlCommand();
                     cmd.Connection = con;
-                    cmd.CommandText = "select Id from BusinessUsers where IsActive=0 and Roles IN('MM2','MM1','MM3') ";
+                    cmd.CommandText = "SELECT Id FROM BusinessUsers WHERE IsActive = 0 and Roles IN('MM2','MM1','MM3') AND Id IN ( SELECT CurrentAssignTo FROM LeadEngine  WHERE ProcessedStatus = 0 GROUP BY CurrentAssignTo HAVING COUNT(*) > 0); ";
                     adapter.SelectCommand = cmd;
                     adapter.Fill(dt);
                     con.Close();
@@ -156,10 +156,10 @@ namespace WithdarwLead
                 using (SqlConnection conn = new SqlConnection(connectionstring))
                 {
                     conn.Open();
-                    using (SqlCommand cmd = new SqlCommand("UPDATE TOP (100) LeadEngine SET CurrentAssignTo =  WHERE CurrentAssignTo = @SourceAgentId", conn))
+                    using (SqlCommand cmd = new SqlCommand("UPDATE LeadEngine SET CurrentAssignTo = @TargetAgentId  WHERE CurrentAssignTo = @SourceAgentId and ProcessedStatus = 0", conn))
                     {
                         cmd.Parameters.AddWithValue("@SourceAgentId", agentId);
-                        cmd.Parameters.AddWithValue("@TargetAgentId", 4000);
+                        cmd.Parameters.AddWithValue("@TargetAgentId", 5000);
                         cmd.ExecuteNonQuery();
                     }
                 }
@@ -281,81 +281,6 @@ namespace WithdarwLead
                     }
                 }
             }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            //int GetAgentWithLeastLeads()
-            //{
-            //    int agentId = -1;
-            //    int minLeadCount = int.MaxValue;
-
-            //    using (SqlConnection conn = new SqlConnection(connectionstring))
-            //    {
-            //        conn.Open();
-            //        using (SqlCommand cmd = new SqlCommand("SELECT CurrentAssignTo, COUNT(*) AS LeadCount FROM LeadEngine WHERE ProcessedStatus = 0 AND CurrentAssignTo IN (SELECT Id FROM BusinessUsers WHERE IsActive = 1  AND Roles IN ('MM2', 'MM1', 'MM3')) GROUP BY CurrentAssignTo ORDER BY LeadCount ASC", conn))
-            //        using (SqlDataReader reader = cmd.ExecuteReader())
-            //        {
-            //            while (reader.Read())
-            //            {
-            //                int currentAgentId = reader.GetInt32(0);
-            //                int leadCount = reader.GetInt32(1);
-
-            //                if (leadCount < 100)
-            //                {
-            //                    minLeadCount = leadCount;
-            //                    agentId = currentAgentId;
-            //                }
-            //            }
-            //        }
-            //    }
-
-            //    return agentId;
-            //}
-
-            //void ReassignLeads(int sourceAgentId, int targetAgentId)
-            //{
-            //    using (SqlConnection conn = new SqlConnection(connectionstring))
-            //    {
-            //        conn.Open();
-            //        using (SqlCommand cmd = new SqlCommand("UPDATE TOP (100) LeadEngine SET CurrentAssignTo = @TargetAgentId WHERE CurrentAssignTo = @SourceAgentId", conn))
-            //        {
-            //            cmd.Parameters.AddWithValue("@SourceAgentId", sourceAgentId);
-            //            cmd.Parameters.AddWithValue("@TargetAgentId", targetAgentId);
-            //            cmd.ExecuteNonQuery();
-            //        }
-            //    }
-            //}
-
 
             Console.WriteLine("with draw lead every 15 mint and assign to other user");
 
