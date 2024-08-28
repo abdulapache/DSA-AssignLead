@@ -5,7 +5,7 @@ namespace WithdarwLead
 {
     class Program
     {
-        static string connectionstring = "Server=ec2-3-143-227-246.us-east-2.compute.amazonaws.com,1433;Database=gosales;User Id= WSUsr; Password=1234!@#$; TrustServerCertificate=True";
+        static string connectionstring = "Server=ec2-18-189-230-198.us-east-2.compute.amazonaws.com;Database=gosales;User Id= WSUsr; Password=1234!@#$; TrustServerCertificate=True";
 
 
         static Timer timer;
@@ -23,7 +23,7 @@ namespace WithdarwLead
         {
             // Calculate the time until the next 30-minute interval
             DateTime now = DateTime.Now;
-            DateTime nextRunTime = now.AddHours(3 - now.Minute % 3).AddMinutes(-now.Minute).AddSeconds(-now.Second);
+            DateTime nextRunTime = now.AddHours(2 - now.Minute % 2).AddMinutes(-now.Minute).AddSeconds(-now.Second);
 
             // Check if it's Sunday, if yes, set the next run time to next Monday
             if (nextRunTime.DayOfWeek == DayOfWeek.Sunday)
@@ -35,137 +35,64 @@ namespace WithdarwLead
             TimeSpan delay = nextRunTime - now;
 
             // Create a timer to trigger the program execution
-            timer = new Timer(ExecuteProgram, null, (int)nextRunTime.Subtract(now).TotalMilliseconds, TimeSpan.FromHours(3).Milliseconds);
+            timer = new Timer(ExecuteProgram, null, delay, TimeSpan.FromHours(2));
         }
 
         static void ExecuteProgram(object state)
         {
 
-            if (IsWithinAllowedTimeRange())
+            var dsa = GoSalesAgentList();
+            if (dsa != null)
             {
-
-                var activeAgent = ActiveAgentList();
-                var inActiveAgent = InActiveAgentList();
-                if (activeAgent != null)
+                foreach (DataRow row in dsa.Rows)
                 {
-                    foreach (DataRow row in activeAgent.Rows)
+                    SqlDataAdapter ad = new SqlDataAdapter();
+                    DataTable dt = new DataTable();
+
+                    var userId = Convert.ToInt32(row[0].ToString());
+
+                    if (userId > 0)
                     {
-                        var userId = Convert.ToInt32(row[0].ToString());
-                        if (userId > 0)
+                        int leadCount = GetLeadCount(userId);
+                        var totalAssginLead = 100 - leadCount;
+                        if (totalAssginLead <= 100 && totalAssginLead >= 0)
                         {
-                            checkCountActiveLead(userId);
+                            SqlConnection conn = new SqlConnection(connectionstring);
+                            conn.Open();
+                            SqlCommand cmd = conn.CreateCommand();
+                            cmd.CommandText = "SELECT TOP (100) Email, Phone, FirstName, LastName, SourceEmail, id FROM FreshLeadsTbl WHERE isdeployed = 0 AND SourceProject IN ('Arabia Business Investors - 91,103 contacts.xlsx') AND Phone NOT IN (SELECT phone FROM Customers) and Phone NOT IN(Select Number from DncrData where IsDncr = 1)";
+                            //cmd.Parameters.AddWithValue("@totalAssginLead", totalAssginLead);
+                            ad.SelectCommand = cmd;
+                            ad.Fill(dt);
+
+                            // upload this cutomer
+
+                            conn.Close();
+                            var c = assignLead(dt, userId);
+                            Console.WriteLine(c + " Lead Assign to AgentId:" + userId);
+
+                            dt = new DataTable();
+                            cmd.Parameters.Clear();
+                        }
+                        else
+                        {
+                            Console.WriteLine("All leads have already been assigned to agents.");
                         }
                     }
                 }
-                if(inActiveAgent != null)
-                {
-                    foreach (DataRow row in inActiveAgent.Rows)
-                    {
-                        var userId = Convert.ToInt32(row[0].ToString());
-                        if (userId > 0)
-                        {
-                            UpdateLead(userId);
-                        }
-                    }
-                }
             }
-            else
-            {
-                Console.WriteLine("Program execution skipped due to time restriction.");
-            }
-            DataTable ActiveAgentList()
-            {
-                DataTable dt = new DataTable();
-                SqlDataAdapter adapter = new SqlDataAdapter();
-                try
-                {
-                    SqlConnection con = new SqlConnection();
-                    con.ConnectionString = connectionstring;
-                    con.Open();
-                    SqlCommand cmd = new SqlCommand();
-                    cmd.Connection = con;
-                    cmd.CommandText = "SELECT Id FROM BusinessUsers WHERE IsActive = 1 and Roles IN('MM2','MM1','MM3') AND Id IN ( SELECT CurrentAssignTo FROM LeadEngine  WHERE ProcessedStatus = 0 GROUP BY CurrentAssignTo HAVING COUNT(*) < 100); ";
-                    adapter.SelectCommand = cmd;
-                    adapter.Fill(dt);
-                    con.Close();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("There is an error on businese user fetching!");
-                    Console.WriteLine(ex.Message);
-                }
-                return dt;
-            }
-
-            DataTable InActiveAgentList()
-            {
-                DataTable dt = new DataTable();
-                SqlDataAdapter adapter = new SqlDataAdapter();
-                try
-                {
-                    SqlConnection con = new SqlConnection();
-                    con.ConnectionString = connectionstring;
-                    con.Open();
-                    SqlCommand cmd = new SqlCommand();
-                    cmd.Connection = con;
-                    cmd.CommandText = "SELECT Id FROM BusinessUsers WHERE IsActive = 0 and Roles IN('MM2','MM1','MM3') AND Id IN ( SELECT CurrentAssignTo FROM LeadEngine  WHERE ProcessedStatus = 0 GROUP BY CurrentAssignTo HAVING COUNT(*) > 0); ";
-                    adapter.SelectCommand = cmd;
-                    adapter.Fill(dt);
-                    con.Close();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("There is an error on businese user fetching!");
-                    Console.WriteLine(ex.Message);
-                }
-                return dt;
-            }
-
-            void checkCountActiveLead(int agentId)
-            {
-                SqlDataAdapter ad = new SqlDataAdapter();
-                DataTable dt = new DataTable();
-                int leadCount = GetLeadCount(agentId);
-                var totalAssginLead = 100 - leadCount;
-                try
-                {
-                    SqlConnection conn = new SqlConnection(connectionstring);
-                    conn.Open();
-                    SqlCommand cmd = conn.CreateCommand();
-
-                    cmd.CommandText = " SELECT TOP ({totalAssginLead}) Email, Phone, FirstName, LastName, SourceEmail  ,id   FROM FreshLeadsTbl      WHERE isdeployed = 0  and SourceProject IN('Hemingway')  and Phone not in(select phone from Customers)";
-
-
-                    ad.SelectCommand = cmd;
-                    ad.Fill(dt);
-
-                    // upload this cutomer
-
-                    conn.Close();
-                    var c = assignLead(dt, agentId);
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
-
-            }
-
-            void UpdateLead(int agentId)
+            int GetLeadCount(int agentId)
             {
                 using (SqlConnection conn = new SqlConnection(connectionstring))
                 {
                     conn.Open();
-                    using (SqlCommand cmd = new SqlCommand("UPDATE LeadEngine SET CurrentAssignTo = @TargetAgentId  WHERE CurrentAssignTo = @SourceAgentId and ProcessedStatus = 0", conn))
+                    using (SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM LeadEngine WHERE CurrentAssignTo = @AgentId AND ProcessedStatus = 0", conn))
                     {
-                        cmd.Parameters.AddWithValue("@SourceAgentId", agentId);
-                        cmd.Parameters.AddWithValue("@TargetAgentId", 5000);
-                        cmd.ExecuteNonQuery();
+                        cmd.Parameters.AddWithValue("@AgentId", agentId);
+                        return (int)cmd.ExecuteScalar();
                     }
                 }
             }
-
-
             int assignLead(DataTable dt, int agentId)
             {
                 var count = 0;
@@ -220,8 +147,6 @@ namespace WithdarwLead
                                     con.Close();
                                     count++;
                                 }
-
-                                
                             }
                             else
                             {
@@ -233,15 +158,11 @@ namespace WithdarwLead
                             Console.WriteLine("There is an error on businese uploadFreshLead!");
                             Console.WriteLine(ex.Message);
                         }
-
-
                     }
                 }
                 else
                 {
-
                     Console.WriteLine("All Leads from Fresh-Databse has been deployed!");
-
                 }
                 return count;
             }
@@ -268,33 +189,58 @@ namespace WithdarwLead
                 con.Close();
                 return res;
             }
-
-            int GetLeadCount(int agentId)
+            int checkDNCR(string phone)
             {
-                using (SqlConnection conn = new SqlConnection(connectionstring))
+                var Dncrres = 0;
+                SqlConnection con = new SqlConnection(connectionstring);
+                con.Open();
+                SqlCommand cmd = new SqlCommand();
+                cmd.Connection = con;
+                string query = "SELECT COUNT(*) FROM DncrData WHERE phone = @Phone and IsDncr = 1";
+                cmd.CommandText = query;
+                cmd.Parameters.AddWithValue("@Phone", phone); // Assuming 'phone' is a string variable
+                object dncrResult = cmd.ExecuteScalar();
+                if (dncrResult != null && dncrResult != DBNull.Value)
                 {
-                    conn.Open();
-                    using (SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM LeadEngine WHERE CurrentAssignTo = @AgentId AND ProcessedStatus = 0", conn))
+                    int count = Convert.ToInt32(dncrResult);
+                    if (count > 0)
                     {
-                        cmd.Parameters.AddWithValue("@AgentId", agentId);
-                        return (int)cmd.ExecuteScalar();
+                        Console.WriteLine("Number is DNCR" + phone);
+                        Dncrres = 1;
                     }
                 }
+                con.Close();
+                return Dncrres;
+            }
+            DataTable GoSalesAgentList()
+            {
+                DataTable dt = new DataTable();
+                SqlDataAdapter adapter = new SqlDataAdapter();
+                try
+                {
+                    SqlConnection con = new SqlConnection();
+                    con.ConnectionString = connectionstring;
+                    con.Open();
+                    SqlCommand cmd = new SqlCommand();
+                    cmd.Connection = con;
+                    cmd.CommandText = "select Id from BusinessUsers where IsActive=1 and Roles IN('MM2','MM1','MM3')";
+                    adapter.SelectCommand = cmd;
+                    adapter.Fill(dt);
+                    con.Close();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("There is an error on businese user fetching!");
+                    Console.WriteLine(ex.Message);
+                }
+                return dt;
             }
 
-            Console.WriteLine("with draw lead every 15 mint and assign to other user");
+            Console.WriteLine("Last Excute" + DateTime.Now.ToString());
 
         }
 
 
-        static bool IsWithinAllowedTimeRange()
-        {
-            // Check if the current time is between 9 AM and 7 PM
-            TimeSpan now = DateTime.Now.TimeOfDay;
-            TimeSpan startTime = TimeSpan.FromHours(4);
-            TimeSpan endTime = TimeSpan.FromHours(14);
 
-            return now >= startTime && now <= endTime;
-        }
     }
 }
